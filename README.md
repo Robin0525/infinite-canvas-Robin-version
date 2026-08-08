@@ -64,7 +64,7 @@ AI API Key、Base URL、画布、素材和生成记录默认保存在浏览器�
 ### 本地开发
 
 ```bash
-git clone git@github.com:basketikun/infinite-canvas.git
+git clone https://github.com/Robin0525/infinite-canvas-Ro-version.git
 cd infinite-canvas
 cd web
 bun install
@@ -74,7 +74,7 @@ bun run dev
 ### Docker 运行
 
 ```bash
-git clone git@github.com:basketikun/infinite-canvas.git
+git clone https://github.com/Robin0525/infinite-canvas-Ro-version.git
 cd infinite-canvas
 docker compose up -d
 ```

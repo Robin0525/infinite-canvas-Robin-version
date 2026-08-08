@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "@/constant/env";
 import { parseChangelog, type ReleaseInfo } from "@/lib/release";
 
-const latestVersionUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/VERSION";
-const latestChangelogUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/CHANGELOG.md";
+const releasesUrl = "https://api.github.com/repos/Robin0525/infinite-canvas-Ro-version/releases?per_page=20";
+type GithubRelease = { tag_name?: string; name?: string; body?: string; published_at?: string; created_at?: string; draft?: boolean; prerelease?: boolean };
 
 function readLocalReleases(): ReleaseInfo[] {
     return __APP_RELEASES__ || [];
@@ -23,6 +23,28 @@ function isNewerVersion(latestVersion: string, currentVersion: string) {
     return latest.some((value, index) => value > current[index] && latest.slice(0, index).every((part, prevIndex) => part === current[prevIndex]));
 }
 
+function releaseItems(body: string) {
+    return body
+        .split("\n")
+        .map((line) => line.replace(/^\s*[-*+]\s*/, "").trim())
+        .filter(Boolean)
+        .map((content) => ({ type: "更新", content }));
+}
+
+function mapRelease(release: GithubRelease): ReleaseInfo | null {
+    const version = (release.tag_name || release.name || "").trim();
+    if (!version) return null;
+    const date = (release.published_at || release.created_at || "").slice(0, 10);
+    return { version, date, items: releaseItems(release.body || "") };
+}
+
+async function fetchReleases() {
+    const response = await fetch(releasesUrl);
+    if (!response.ok) throw new Error("release request failed");
+    const data = (await response.json()) as GithubRelease[];
+    return data.filter((release) => !release.draft && !release.prerelease).map(mapRelease).filter((release): release is ReleaseInfo => Boolean(release));
+}
+
 export function useVersionCheck() {
     const { t } = useTranslation();
     const currentVersion = APP_VERSION;
@@ -36,10 +58,9 @@ export function useVersionCheck() {
 
     const checkLatestVersion = useCallback(async () => {
         try {
-            const response = await fetch(latestVersionUrl);
-            if (!response.ok) return false;
-            const version = await response.text();
-            setLatestVersion(version.trim() || currentVersion);
+            const [latest] = await fetchReleases();
+            if (!latest) return false;
+            setLatestVersion(latest.version);
             return true;
         } catch {
             return false;
@@ -50,12 +71,10 @@ export function useVersionCheck() {
         async (showMessage = false) => {
             setChecking(true);
             try {
-                const [versionResponse, changelogResponse] = await Promise.all([fetch(latestVersionUrl), fetch(latestChangelogUrl)]);
-                if (!versionResponse.ok) throw new Error(t("version.readFailed"));
-                if (!changelogResponse.ok) throw new Error(t("version.changelogFailed"));
-                const [version, changelog] = await Promise.all([versionResponse.text(), changelogResponse.text()]);
-                setLatestVersion(version.trim() || currentVersion);
-                if (changelog.trim()) setReleases(parseChangelog(changelog));
+                const releases = await fetchReleases();
+                if (!releases.length) throw new Error(t("version.readFailed"));
+                setLatestVersion(releases[0].version);
+                setReleases(releases);
                 if (showMessage) message.success(t("version.updated"));
                 return true;
             } catch {

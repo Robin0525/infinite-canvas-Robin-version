@@ -1,6 +1,7 @@
-import { Check, Download, Pencil, Trash2, X } from "lucide-react";
+import { Check, Copy, Download, Pencil, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Input } from "antd";
+import { App, Button, Input, Modal } from "antd";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
@@ -8,10 +9,12 @@ import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
+    const { message } = App.useApp();
     const { i18n, t } = useTranslation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const renameProject = useCanvasStore((state) => state.renameProject);
+    const duplicateProject = useCanvasStore((state) => state.duplicateProject);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
     const editingTitle = useCanvasUiStore((state) => state.editingProjectTitle);
@@ -20,6 +23,9 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const stopEditing = useCanvasUiStore((state) => state.stopEditingProject);
     const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
+    const [exporting, setExporting] = useState(false);
+    const [copyOpen, setCopyOpen] = useState(false);
+    const [copyTitle, setCopyTitle] = useState("");
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
     const open = () => navigate(`/canvas/${project.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`);
@@ -27,8 +33,33 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
         renameProject(project.id, editingTitle);
         stopEditing();
     };
+    const exportProject = async () => {
+        if (exporting) return;
+        setExporting(true);
+        const hide = message.loading(t("canvas.libraryExporting"), 0);
+        try {
+            const saved = await exportCanvasProjects([project], project.title || t("canvas.title"));
+            if (saved) message.success(t("canvas.libraryExported", { count: 1 }));
+        } catch (error) {
+            console.error(error);
+            message.error(t("canvas.libraryExportFailed"));
+        } finally {
+            hide();
+            setExporting(false);
+        }
+    };
+    const openCopyDialog = () => {
+        setCopyTitle(`${project.title} ${t("canvas.project.copySuffix")}`);
+        setCopyOpen(true);
+    };
+    const confirmCopy = () => {
+        if (!copyTitle.trim()) return;
+        duplicateProject(project.id, copyTitle);
+        setCopyOpen(false);
+        message.success(t("canvas.project.copied"));
+    };
 
-    return (
+    return <>
         <article className="group flex min-h-44 cursor-pointer flex-col justify-between rounded-2xl bg-[#f1eee8] p-5 transition hover:bg-[#ebe6dc] dark:bg-white/5 dark:hover:bg-white/10" onClick={() => !editing && open()}>
             <div className="flex items-start gap-3">
                 <input
@@ -67,7 +98,8 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                         </>
                     ) : (
                         <>
-                            <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects([project], project.title || t("canvas.title"))} aria-label={t("canvas.project.export")} />
+                            <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} loading={exporting} disabled={exporting} onClick={() => void exportProject()} aria-label={t("canvas.project.export")} />
+                            <Button type="text" size="small" shape="circle" icon={<Copy className="size-4" />} onClick={openCopyDialog} aria-label={t("canvas.project.copy")} />
                             <Button type="text" size="small" shape="circle" icon={<Pencil className="size-4" />} onClick={() => startEditing(project.id, project.title)} aria-label={t("canvas.project.rename")} />
                             <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-4" />} onClick={() => setDeleteIds([project.id])} aria-label={t("canvas.project.delete")} />
                         </>
@@ -75,5 +107,8 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                 </div>
             </div>
         </article>
-    );
+        <Modal title={t("canvas.project.copyTitle")} open={copyOpen} onCancel={() => setCopyOpen(false)} onOk={confirmCopy} okButtonProps={{ disabled: !copyTitle.trim() }} okText={t("common.confirm")} cancelText={t("common.cancel")}>
+            <Input value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} onPressEnter={confirmCopy} autoFocus />
+        </Modal>
+    </>;
 }

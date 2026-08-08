@@ -369,6 +369,7 @@ function readApiErrorMessage(value: unknown): string {
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return apiText("requestCanceled");
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; message?: string; code?: number | string }>(error)) {
+        if (error.response?.status === 524) return i18n.t("apiGatewayTimeout524");
         const responseData = error.response?.data;
         return readApiErrorMessage(responseData) || statusMessage(error.response?.status, fallback);
     }
@@ -379,6 +380,7 @@ function readAxiosError(error: unknown, fallback: string) {
 function statusMessage(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return apiText("authenticationFailed");
     if (status === 429) return apiText("rateLimited");
+    if (status === 524) return i18n.t("apiGatewayTimeout524");
     return status ? `${fallback}（${status}）` : fallback;
 }
 

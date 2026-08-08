@@ -26,6 +26,7 @@ type CanvasStore = {
     projects: CanvasProject[];
     createProject: (title?: string) => string;
     importProject: (project: Partial<CanvasProject>) => string;
+    duplicateProject: (id: string, title: string) => string | null;
     openProject: (id: string) => CanvasProject | null;
     renameProject: (id: string, title: string) => void;
     deleteProjects: (ids: string[]) => void;
@@ -98,6 +99,20 @@ export const useCanvasStore = create<CanvasStore>()(
                     backgroundMode: source.backgroundMode || "lines",
                     showImageInfo: source.showImageInfo || false,
                     viewport: source.viewport || initialViewport,
+                };
+                set((state) => ({ projects: [project, ...state.projects] }));
+                return project.id;
+            },
+            duplicateProject: (id, title) => {
+                const source = get().projects.find((item) => item.id === id);
+                if (!source) return null;
+                const now = new Date().toISOString();
+                const project: CanvasProject = {
+                    ...structuredClone(source),
+                    id: nanoid(),
+                    title: title.trim() || `${source.title} ${i18n.t("canvas.project.copySuffix")}`,
+                    createdAt: now,
+                    updatedAt: now,
                 };
                 set((state) => ({ projects: [project, ...state.projects] }));
                 return project.id;

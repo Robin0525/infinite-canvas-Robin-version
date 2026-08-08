@@ -2,15 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Group, Video } from "lucide-react";
-import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
-import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
-import { uploadImage } from "@/services/image-storage";
-import { uploadMediaFile } from "@/services/file-storage";
+import { defaultConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { getImageBlob, uploadImage } from "@/services/image-storage";
+import { getMediaBlob, uploadMediaFile } from "@/services/file-storage";
+import { downloadFile } from "@/lib/download-file";
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
@@ -123,6 +123,40 @@ const CONNECTION_HANDLE_HIT_RADIUS = 40;
 const CONNECTION_NODE_HIT_PADDING = 32;
 const NODE_STATUS_IDLE = "idle" as const;
 const NODE_STATUS_LOADING = "loading" as const;
+
+function rememberedConfigMetadata(nodes: CanvasNodeData[], config: AiConfig): CanvasNodeMetadata {
+    const previous = [...nodes].reverse().find((node) => node.type === CanvasNodeType.Config)?.metadata;
+    return {
+        generationMode: previous?.generationMode || "image",
+        model: previous?.model || config.imageModel || config.model,
+        reasoningEffort: previous?.reasoningEffort || config.reasoningEffort,
+        quality: previous?.quality || config.quality,
+        imageResolution: previous?.imageResolution || config.imageResolution,
+        size: previous?.size || config.size,
+        background: previous?.background ?? config.background,
+        count: previous?.count || getGenerationCount(config.canvasImageCount || config.count),
+        seconds: previous?.seconds || config.videoSeconds,
+        vquality: previous?.vquality || config.vquality,
+        generateAudio: previous?.generateAudio || config.videoGenerateAudio,
+        watermark: previous?.watermark || config.videoWatermark,
+        audioVoice: previous?.audioVoice || config.audioVoice,
+        audioFormat: previous?.audioFormat || config.audioFormat,
+        audioSpeed: previous?.audioSpeed || config.audioSpeed,
+        audioInstructions: previous?.audioInstructions || config.audioInstructions,
+    };
+}
+
+function alignNodeRow(nodes: CanvasNodeData[], ids: string[], start: Position, gap = 36) {
+    const positions = new Map<string, Position>();
+    let x = start.x;
+    ids.forEach((id) => {
+        const node = nodes.find((item) => item.id === id);
+        if (!node) return;
+        positions.set(id, { x, y: start.y });
+        x += node.width + gap;
+    });
+    return nodes.map((node) => (positions.has(node.id) ? { ...node, position: positions.get(node.id)! } : node));
+}
 const NODE_STATUS_SUCCESS = "success" as const;
 const NODE_STATUS_ERROR = "error" as const;
 export default function CanvasPage() {
@@ -498,7 +532,7 @@ function InfiniteCanvasPage() {
 
     const createConnectedNode = useCallback(
         (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video | CanvasNodeType.Audio, pending: PendingConnectionCreate) => {
-            const metadata = type === CanvasNodeType.Config ? { model: effectiveConfig.imageModel || effectiveConfig.model, size: effectiveConfig.size, count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count) } : undefined;
+            const metadata = type === CanvasNodeType.Config ? rememberedConfigMetadata(nodesRef.current, effectiveConfig) : undefined;
             const newNode = createCanvasNode(type, pending.position, metadata);
             const connection = normalizeConnection(pending.connection.nodeId, newNode.id, [...nodesRef.current, newNode], pending.connection.handleType);
             if (!connection) {
@@ -513,7 +547,7 @@ function InfiniteCanvasPage() {
             setPendingConnectionCreate(null);
             setConnecting(null);
         },
-        [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, message, setConnecting, t],
+        [effectiveConfig, message, setConnecting, t],
     );
 
     const cancelPendingConnectionCreate = useCallback(() => {
@@ -679,14 +713,7 @@ function InfiniteCanvasPage() {
     const createNode = useCallback(
         (type: CanvasNodeTypeId, position?: Position) => {
             const targetPosition = position || getCanvasCenter();
-            const configMetadata =
-                type === CanvasNodeType.Config
-                    ? {
-                          model: effectiveConfig.imageModel || effectiveConfig.model,
-                          size: effectiveConfig.size,
-                          count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
-                      }
-                    : undefined;
+            const configMetadata = type === CanvasNodeType.Config ? rememberedConfigMetadata(nodesRef.current, effectiveConfig) : undefined;
             const newNode = createCanvasNode(type, targetPosition, configMetadata);
 
             setNodes((prev) => [...prev, newNode]);
@@ -705,7 +732,7 @@ function InfiniteCanvasPage() {
                     : isBuiltinType(type) && type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio && type !== CanvasNodeType.Group;
             if (wantsPanel) setDialogNodeId(newNode.id);
         },
-        [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
+        [effectiveConfig, getCanvasCenter],
     );
 
     const deleteNodes = useCallback(
@@ -990,8 +1017,8 @@ function InfiniteCanvasPage() {
         if (!project) return message.error(t("canvas.projectPage.notFound"));
         const hide = message.loading(t("canvas.projectPage.exporting"), 0);
         try {
-            await exportCanvasProjects([project], project.title || t("canvas.title"));
-            message.success(t("canvas.projectPage.exported"));
+            const saved = await exportCanvasProjects([project], project.title || t("canvas.title"));
+            if (saved) message.success(t("canvas.projectPage.exported"));
         } catch (error) {
             console.error(error);
             message.error(t("canvas.sidePanel.exportFailed"));
@@ -1330,6 +1357,72 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
     }, []);
 
+    const replaceNodeFile = useCallback(async (node: CanvasNodeData, file: File) => {
+        if (node.type === CanvasNodeType.Text && file.type.startsWith("text/")) {
+            const content = await file.text();
+            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, title: file.name || content.slice(0, 32) || item.title, metadata: { ...item.metadata, content, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : item)));
+            return true;
+        }
+        if (node.type === CanvasNodeType.Image && file.type.startsWith("image/")) {
+            const image = await uploadImage(file);
+            const nextSize = fitNodeSize(image.width, image.height);
+            const center = { x: node.position.x + node.width / 2, y: node.position.y + node.height / 2 };
+            setNodes((prev) =>
+                prev.map((item) =>
+                    item.id === node.id
+                        ? {
+                              ...item,
+                              title: file.name,
+                              width: nextSize.width,
+                              height: nextSize.height,
+                              position: { x: center.x - nextSize.width / 2, y: center.y - nextSize.height / 2 },
+                              metadata: { ...item.metadata, ...imageMetadata(image), errorDetails: undefined },
+                          }
+                        : item,
+                ),
+            );
+            return true;
+        }
+        if (node.type === CanvasNodeType.Video && file.type.startsWith("video/")) {
+            const video = await uploadMediaFile(file, "video");
+            const nextSize = fitNodeSize(video.width || 1280, video.height || 720, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+            const center = { x: node.position.x + node.width / 2, y: node.position.y + node.height / 2 };
+            setNodes((prev) =>
+                prev.map((item) =>
+                    item.id === node.id
+                        ? {
+                              ...item,
+                              title: file.name,
+                              width: nextSize.width,
+                              height: nextSize.height,
+                              position: { x: center.x - nextSize.width / 2, y: center.y - nextSize.height / 2 },
+                              metadata: { ...item.metadata, ...videoMetadata(video), errorDetails: undefined },
+                          }
+                        : item,
+                ),
+            );
+            return true;
+        }
+        if (node.type === CanvasNodeType.Audio && isAudioFile(file)) {
+            const audio = await uploadMediaFile(file, "audio");
+            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, title: file.name, metadata: { ...item.metadata, ...audioMetadata(audio), errorDetails: undefined } } : item)));
+            return true;
+        }
+        return false;
+    }, []);
+
+    const createTextDropNode = useCallback(
+        (text: string, position: Position) => {
+            const trimmed = text.trim();
+            if (!trimmed) return;
+            const node = { ...createCanvasNode(CanvasNodeType.Text, position, { content: trimmed, status: NODE_STATUS_SUCCESS }), title: trimmed.slice(0, 32) || t("canvas.nodeTypes.text") };
+            setNodes((prev) => [...prev, node]);
+            setSelectedNodeIds(new Set([node.id]));
+            setSelectedConnectionId(null);
+        },
+        [t],
+    );
+
     const createTextNodeFromClipboard = useCallback(
         (text: string) => {
             const trimmed = text.trim();
@@ -1372,7 +1465,8 @@ function InfiniteCanvasPage() {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target instanceof Element ? event.target : null;
-            if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || target?.closest("[contenteditable='true'],[data-canvas-no-zoom],[data-canvas-shortcuts-ignore]")) return;
+            if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || target?.closest("[contenteditable='true'],[data-canvas-no-zoom],[data-canvas-shortcuts-ignore]"))
+                return;
 
             const key = event.key.toLowerCase();
             const isModifierShortcut = event.metaKey || event.ctrlKey;
@@ -1553,10 +1647,22 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node)));
     }, []);
 
-    const downloadNodeImage = useCallback((node: CanvasNodeData) => {
-        if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
-        saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
-    }, []);
+    const downloadNodeImage = useCallback(
+        async (node: CanvasNodeData) => {
+            if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
+            try {
+                const storageKey = node.metadata.storageKey;
+                const blob = storageKey ? await (storageKey.startsWith("image:") ? getImageBlob(storageKey) : getMediaBlob(storageKey)) : null;
+                const extension = node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content);
+                const saved = await downloadFile(blob || node.metadata.content, `canvas-${node.type}-${node.id}.${extension}`);
+                if (saved) message.success(t("assets.downloaded"));
+            } catch (error) {
+                console.error(error);
+                message.error(t("assets.downloadFailed"));
+            }
+        },
+        [message, t],
+    );
 
     const saveNodeAsset = useCallback(
         async (node: CanvasNodeData) => {
@@ -1616,7 +1722,11 @@ function InfiniteCanvasPage() {
             const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
             const centerY = node.position.y + node.height / 2;
             const textNode = {
-                ...createCanvasNode(CanvasNodeType.Text, { x: node.position.x + node.width + gap + textSpec.width / 2, y: centerY }, { content: t("canvas.projectPage.reversePreset"), prompt: t("canvas.projectPage.reversePreset"), status: NODE_STATUS_SUCCESS, fontSize: 14 }),
+                ...createCanvasNode(
+                    CanvasNodeType.Text,
+                    { x: node.position.x + node.width + gap + textSpec.width / 2, y: centerY },
+                    { content: t("canvas.projectPage.reversePreset"), prompt: t("canvas.projectPage.reversePreset"), status: NODE_STATUS_SUCCESS, fontSize: 14 },
+                ),
                 title: t("canvas.projectPage.reverseTitle"),
             };
             const configNode = {
@@ -1848,9 +1958,7 @@ function InfiniteCanvasPage() {
 
     const handleImageInputChange = useCallback(
         async (event: ReactChangeEvent<HTMLInputElement>) => {
-            const files = Array.from(event.target.files || []).filter(
-                (f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isAudioFile(f),
-            );
+            const files = Array.from(event.target.files || []).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/") || isAudioFile(f));
             if (!files.length) {
                 uploadTargetRef.current = null;
                 event.target.value = "";
@@ -1858,12 +1966,7 @@ function InfiniteCanvasPage() {
             }
 
             const target = uploadTargetRef.current;
-            const basePosition =
-                target?.position ||
-                screenToCanvas(
-                    (containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2,
-                    (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2,
-                );
+            const basePosition = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
             const STAGGER = 40; // Offset between multiple imported files.
 
             // When replacing a target node, use the first file as the replacement and create the rest nearby.
@@ -1936,6 +2039,7 @@ function InfiniteCanvasPage() {
                                           model: undefined,
                                           size: undefined,
                                           quality: undefined,
+                                          imageResolution: undefined,
                                           count: undefined,
                                           references: undefined,
                                           primaryImageId: undefined,
@@ -1985,17 +2089,43 @@ function InfiniteCanvasPage() {
     const handleDrop = useCallback(
         (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
-            const files = Array.from(event.dataTransfer.files).filter(
-                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
-            );
-            if (!files.length) return;
-
+            event.stopPropagation();
+            const targetElement = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-node-id]") : null;
+            const targetNode = targetElement ? nodesRef.current.find((node) => node.id === targetElement.dataset.nodeId) : undefined;
+            const files = Array.from(event.dataTransfer.files).filter((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || item.type.startsWith("text/") || isAudioFile(item));
             const basePos = screenToCanvas(event.clientX, event.clientY);
+            if (files.length === 1 && targetNode) {
+                void replaceNodeFile(targetNode, files[0]).then((replaced) => {
+                    if (replaced) {
+                        setSelectedNodeIds(new Set([targetNode.id]));
+                        setSelectedConnectionId(null);
+                    } else {
+                        const file = files[0];
+                        if (file.type.startsWith("text/")) void file.text().then((text) => createTextDropNode(text, basePos));
+                        else if (isAudioFile(file)) void createAudioFileNode(file, basePos);
+                        else if (file.type.startsWith("video/")) void createVideoFileNode(file, basePos);
+                        else void createImageFileNode(file, basePos);
+                    }
+                });
+                return;
+            }
+            if (!files.length) {
+                const text = event.dataTransfer.getData("text/plain").trim();
+                if (!text) return;
+                if (targetNode?.type === CanvasNodeType.Text) {
+                    setNodes((prev) => prev.map((node) => (node.id === targetNode.id ? { ...node, title: text.slice(0, 32) || node.title, metadata: { ...node.metadata, content: text, status: NODE_STATUS_SUCCESS, errorDetails: undefined } } : node)));
+                    setSelectedNodeIds(new Set([targetNode.id]));
+                    setSelectedConnectionId(null);
+                } else createTextDropNode(text, basePos);
+                return;
+            }
             const STAGGER = 40;
             for (let i = 0; i < files.length; i++) {
                 const pos = { x: basePos.x + i * STAGGER, y: basePos.y + i * STAGGER };
                 const f = files[i];
-                if (isAudioFile(f)) {
+                if (f.type.startsWith("text/")) {
+                    void f.text().then((text) => createTextDropNode(text, pos));
+                } else if (isAudioFile(f)) {
                     void createAudioFileNode(f, pos);
                 } else if (f.type.startsWith("video/")) {
                     void createVideoFileNode(f, pos);
@@ -2004,7 +2134,7 @@ function InfiniteCanvasPage() {
                 }
             }
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
+        [createAudioFileNode, createImageFileNode, createTextDropNode, createVideoFileNode, replaceNodeFile, screenToCanvas],
     );
 
     const startTitleEditing = useCallback(() => {
@@ -2094,7 +2224,8 @@ function InfiniteCanvasPage() {
                 return;
             }
             let pendingChildIds: string[] = [];
-            if (markSourceStatus) setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, ...(node.type === CanvasNodeType.Config ? {} : { prompt }), status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)));
+            if (markSourceStatus)
+                setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, ...(node.type === CanvasNodeType.Config ? {} : { prompt }), status: NODE_STATUS_LOADING, errorDetails: undefined } } : node)));
 
             try {
                 if (mode === "image") {
@@ -2143,8 +2274,8 @@ function InfiniteCanvasPage() {
                         type: CanvasNodeType.Image,
                         title: effectivePrompt.slice(0, 32) || "Generated Image",
                         position: {
-                            x: rootNode.position.x + rootNode.width + 120 + (index % 2) * (imageConfig.width + 36),
-                            y: rootNode.position.y + Math.floor(index / 2) * (imageConfig.height + rowGap),
+                            x: rootNode.position.x + rootNode.width + rowGap + index * (imageConfig.width + rowGap),
+                            y: rootNode.position.y,
                         },
                         width: imageConfig.width,
                         height: imageConfig.height,
@@ -2210,11 +2341,9 @@ function InfiniteCanvasPage() {
                                     const root = prev.find((node) => node.id === rootId);
                                     return prev.map((node) => {
                                         if (node.id !== targetId && node.id !== rootId) return node;
-                                        const center = { x: node.position.x + node.width / 2, y: node.position.y + node.height / 2 };
                                         if (node.id === rootId && (targetId === rootId || !root?.metadata?.primaryImageId))
                                             return {
                                                 ...node,
-                                                position: { x: center.x - imageSize.width / 2, y: center.y - imageSize.height / 2 },
                                                 width: imageSize.width,
                                                 height: imageSize.height,
                                                 metadata: { ...node.metadata, ...imageMetadata(uploaded), primaryImageId: targetId },
@@ -2222,7 +2351,6 @@ function InfiniteCanvasPage() {
                                         if (node.id === targetId)
                                             return {
                                                 ...node,
-                                                position: { x: center.x - imageSize.width / 2, y: center.y - imageSize.height / 2 },
                                                 width: imageSize.width,
                                                 height: imageSize.height,
                                                 metadata: { ...node.metadata, ...imageMetadata(uploaded) },
@@ -2245,6 +2373,7 @@ function InfiniteCanvasPage() {
                             return false;
                         }),
                     );
+                    if (count > 1) setNodes((prev) => alignNodeRow(prev, [rootId, ...childIds], rootNode.position, rowGap));
                     if (count > 1) finishGenerationRequest(rootId, controller);
                     if (controller.signal.aborted) {
                         setNodes((prev) => prev.map((node) => (node.id === nodeId && isConfigNode && node.metadata?.status === NODE_STATUS_LOADING ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_IDLE, errorDetails: undefined } } : node)));
@@ -2379,8 +2508,8 @@ function InfiniteCanvasPage() {
                         type: CanvasNodeType.Text,
                         title: effectivePrompt.slice(0, 32) || "Generated Text",
                         position: {
-                            x: parentPosition.x + parentConfig.width + 96,
-                            y: parentPosition.y + parentConfig.height / 2 - textConfig.height / 2 + (index - (textCount - 1) / 2) * (textConfig.height + 36),
+                            x: parentPosition.x + parentConfig.width + 96 + index * (textConfig.width + 36),
+                            y: parentPosition.y,
                         },
                         width: textConfig.width,
                         height: textConfig.height,
@@ -2459,6 +2588,7 @@ function InfiniteCanvasPage() {
                           ...effectiveConfig,
                           model: savedImageMetadata.model || effectiveConfig.imageModel || effectiveConfig.model,
                           quality: savedImageMetadata.quality || effectiveConfig.quality,
+                          imageResolution: savedImageMetadata.imageResolution || effectiveConfig.imageResolution,
                           size: savedImageMetadata.size || effectiveConfig.size,
                           background: savedImageMetadata.background ?? effectiveConfig.background,
                           count: "1",
@@ -2552,6 +2682,7 @@ function InfiniteCanvasPage() {
                           model: generationConfig.model,
                           size: generationConfig.size,
                           quality: generationConfig.quality,
+                          imageResolution: generationConfig.imageResolution,
                           ...(generationConfig.background ? { background: generationConfig.background } : {}),
                           count: savedImageMetadata.count || 1,
                           references: savedImageMetadata.references,
@@ -2599,12 +2730,7 @@ function InfiniteCanvasPage() {
                     x: sourceNode.position.x + sourceNode.width + 96 + nodeSize.width / 2,
                     y: sourceNode.position.y + sourceNode.height / 2,
                 },
-                {
-                    prompt: "",
-                    model: effectiveConfig.imageModel || effectiveConfig.model,
-                    size: effectiveConfig.size,
-                    count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
-                },
+                { ...rememberedConfigMetadata(nodesRef.current, effectiveConfig), generationMode: "image", prompt: "" },
             );
             const connection = { id: nanoid(), fromNodeId: sourceNode.id, toNodeId: configNode.id };
             const nextNodes = nodesRef.current.map((item) => (item.id === sourceNode.id ? { ...item, metadata: { ...item.metadata, content: prompt, prompt, status: NODE_STATUS_SUCCESS } } : item)).concat(configNode);
@@ -2617,7 +2743,7 @@ function InfiniteCanvasPage() {
             setSelectedConnectionId(null);
             setDialogNodeId(configNode.id);
         },
-        [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, message, t],
+        [effectiveConfig, message, t],
     );
 
     const insertAssistantImage = useCallback(
@@ -2923,7 +3049,7 @@ function InfiniteCanvasPage() {
                     onToggleDialog={(node) => setDialogNodeId((current) => (current === node.id ? null : node.id))}
                     onGenerateImage={generateImageFromTextNode}
                     onUpload={(node) => handleUploadRequest(node.id)}
-                    onDownload={downloadNodeImage}
+                    onDownload={(node) => void downloadNodeImage(node)}
                     onSaveAsset={(node) => void saveNodeAsset(node)}
                     onMaskEdit={(node) => setMaskEditNodeId(node.id)}
                     onCrop={(node) => setCropNodeId(node.id)}

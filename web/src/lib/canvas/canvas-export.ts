@@ -1,6 +1,5 @@
-import { saveAs } from "file-saver";
-
 import i18n from "@/i18n";
+import { downloadFile } from "@/lib/download-file";
 import { createZip } from "@/lib/zip";
 import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob } from "@/services/image-storage";
@@ -28,7 +27,7 @@ export async function exportCanvasProjects(projects: CanvasProject[], fileName =
 
     const data: CanvasExportFile = { app: "infinite-canvas", version: 3, exportedAt: new Date().toISOString(), projects: exportedProjects };
     const zip = await createZip([{ name: "projects.json", data: JSON.stringify(data, null, 2) }, ...zipFiles]);
-    saveAs(zip, `${safeFileName(fileName)}.zip`);
+    return downloadFile(zip, `${safeFileName(fileName)}.zip`);
 }
 
 export async function exportCanvasNodes(nodes: CanvasNodeData[], fileName = i18n.t("canvas.export.defaultNodesName")) {
@@ -61,7 +60,7 @@ export async function exportCanvasNodes(nodes: CanvasNodeData[], fileName = i18n
     );
 
     const zip = await createZip(zipFiles);
-    saveAs(zip, `${safeFileName(fileName)}.zip`);
+    return downloadFile(zip, `${safeFileName(fileName)}.zip`);
 }
 
 function collectStorageKeys(value: unknown, keys = new Set<string>()) {

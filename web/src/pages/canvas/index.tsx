@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
@@ -21,6 +21,7 @@ export default function CanvasPage() {
     const [searchParams] = useSearchParams();
     const inputRef = useRef<HTMLInputElement>(null);
     const autoOpenRef = useRef(false);
+    const [exporting, setExporting] = useState(false);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
     const createProject = useCanvasStore((state) => state.createProject);
@@ -61,6 +62,23 @@ export default function CanvasPage() {
         }
     };
 
+    const exportSelectedProjects = async () => {
+        const targets = projects.filter((project) => selectedIds.includes(project.id));
+        if (!targets.length || exporting) return;
+        setExporting(true);
+        const hide = message.loading(t("canvas.libraryExporting"), 0);
+        try {
+            const saved = await exportCanvasProjects(targets, `${t("canvas.title")}-${targets.length}`);
+            if (saved) message.success(t("canvas.libraryExported", { count: targets.length }));
+        } catch (error) {
+            console.error(error);
+            message.error(t("canvas.libraryExportFailed"));
+        } finally {
+            hide();
+            setExporting(false);
+        }
+    };
+
     useEffect(() => {
         if (!hydrated || autoOpenRef.current || (mode !== "new" && mode !== "recent")) return;
         autoOpenRef.current = true;
@@ -80,7 +98,7 @@ export default function CanvasPage() {
                     <div className="flex items-center gap-2">
                         {selectedIds.length ? (
                             <>
-                                <Button disabled={!hydrated} icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects(projects.filter((project) => selectedIds.includes(project.id)), `${t("canvas.title")}-${selectedIds.length}`)}>
+                                <Button disabled={!hydrated || exporting} loading={exporting} icon={<Download className="size-4" />} onClick={() => void exportSelectedProjects()}>
                                     {t("canvas.exportSelected")}
                                 </Button>
                                 <Button disabled={!hydrated} onClick={() => setDeleteIds(selectedIds)}>

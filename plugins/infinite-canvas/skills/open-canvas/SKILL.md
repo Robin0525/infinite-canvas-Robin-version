@@ -5,9 +5,9 @@ description: 打开 Infinite Canvas 在线或本地画布，并自动连接本�
 
 # Open Infinite Canvas
 
-默认打开在线版。只有用户明确要求使用本地项目时，才启动本地前端。
+默认使用已安装的 Windows 桌面版；不要打开上游在线站点。只有用户明确要求使用浏览器开发模式时，才启动本地前端。
 
-## 在线版
+## Windows 桌面版
 
 1. 启动本地 Canvas Agent 并保持运行：
 
@@ -17,11 +17,7 @@ npx -y @basketikun/canvas-agent
 
 2. 从启动输出取得 `Local URL` 和 `Connect token`。
 
-3. 在 Codex 右侧浏览器打开：
-
-```text
-https://canvas.best/canvas?mode=new&agentUrl=<Local URL>&agentToken=<Connect token>
-```
+3. 打开「无限画板」Windows 桌面版，在 Agent 面板输入 `Local URL` 和 `Connect token` 后连接。
 
 ## 本地版
 
@@ -47,8 +43,8 @@ npx -y @basketikun/canvas-agent
 
 ## MCP 与连接地址
 
-插件在新的 Codex 任务中加载时会自动启动 `npx -y @basketikun/canvas-agent mcp`。这个 MCP 进程负责提供画布工具，不提供网页连接服务；
-上面启动的普通 Canvas Agent 负责提供 `Local URL` 和 `Connect token`。两个进程读取同一份本地配置，因此不需要用户手动填写地址或 token。
+插件在新的 Codex 任务中加载时会自动启动 `npx -y @basketikun/canvas-agent mcp`。这个 MCP 进程负责提供画布工具，不提供桌面应用连接服务；
+因此还需要启动上面所示的普通 Canvas Agent，再把它输出的 `Local URL` 和 `Connect token` 填入桌面版 Agent 面板。两个进程读取同一份本地配置。
 
 ## 打开模式
 

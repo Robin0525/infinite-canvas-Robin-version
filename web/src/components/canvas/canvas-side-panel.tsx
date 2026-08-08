@@ -172,9 +172,11 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, onPreviewNode, th
         setExporting(true);
         const hide = message.loading(t("canvas.sidePanel.exporting"), 0);
         try {
-            await exportCanvasNodes(targets, t("canvas.sidePanel.exportName", { count: targets.length }));
-            message.success(t("canvas.sidePanel.exported", { count: targets.length }));
-            exitSelect();
+            const saved = await exportCanvasNodes(targets, t("canvas.sidePanel.exportName", { count: targets.length }));
+            if (saved) {
+                message.success(t("canvas.sidePanel.exported", { count: targets.length }));
+                exitSelect();
+            }
         } catch (error) {
             console.error(error);
             message.error(t("canvas.sidePanel.exportFailed"));

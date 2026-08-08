@@ -1,12 +1,13 @@
 import { Copy, Download, PencilLine, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Button, Card, Drawer, Empty, Form, Image, Input, Modal, Pagination, Select, Space, Tag, Typography } from "antd";
-import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes, readFileAsDataUrl } from "@/lib/image-utils";
-import { uploadImage } from "@/services/image-storage";
+import { getImageBlob, uploadImage } from "@/services/image-storage";
+import { getMediaBlob } from "@/services/file-storage";
+import { downloadFile } from "@/lib/download-file";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
@@ -134,7 +135,9 @@ export default function AssetsPage() {
         const image = await uploadImage(file);
         const draft = { dataUrl: image.url, storageKey: image.storageKey, width: image.width, height: image.height, bytes: image.bytes, mimeType: image.mimeType };
         setImageDraft(draft);
-        if (!form.getFieldValue("coverUrl")) form.setFieldValue("coverUrl", draft.dataUrl);
+        // The uploaded image is the asset content and cover. Always replace the
+        // prior draft so selecting a second file cannot save the first one.
+        form.setFieldValue("coverUrl", draft.dataUrl);
         if (!form.getFieldValue("title")) form.setFieldValue("title", file.name);
     };
 
@@ -143,9 +146,18 @@ export default function AssetsPage() {
         copyText(asset.data.content, t("assets.textCopied"));
     };
 
-    const downloadImage = (asset: Asset) => {
+    const downloadImage = async (asset: Asset) => {
         if (asset.kind !== "image" && asset.kind !== "video") return;
-        saveAs(asset.kind === "video" ? asset.data.url : asset.data.dataUrl, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "png"}`);
+        try {
+            const blob = asset.data.storageKey ? await (asset.kind === "image" ? getImageBlob(asset.data.storageKey) : getMediaBlob(asset.data.storageKey)) : null;
+            const source = blob || (asset.kind === "video" ? asset.data.url : asset.data.dataUrl);
+            if (!source) throw new Error("Missing asset content");
+            const saved = await downloadFile(source, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "png"}`);
+            if (saved) message.success(t("assets.downloaded"));
+        } catch (error) {
+            console.error(error);
+            message.error(t("assets.downloadFailed"));
+        }
     };
 
     const exportAllAssets = async () => {
@@ -260,7 +272,7 @@ export default function AssetsPage() {
                 <div className="mx-auto flex max-w-7xl flex-col gap-5">
                     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {visibleAssets.map((asset) => (
-                            <AssetCard key={asset.id} asset={asset} onOpen={() => setPreviewAsset(asset)} onEdit={() => openEdit(asset)} onCopy={copyAssetText} onDownload={downloadImage} onDelete={() => setDeletingAsset(asset)} />
+                            <AssetCard key={asset.id} asset={asset} onOpen={() => setPreviewAsset(asset)} onEdit={() => openEdit(asset)} onCopy={copyAssetText} onDownload={(asset) => void downloadImage(asset)} onDelete={() => setDeletingAsset(asset)} />
                         ))}
                     </div>
 
@@ -388,7 +400,7 @@ export default function AssetsPage() {
                 />
             </Modal>
 
-            <AssetDrawer asset={previewAsset} onClose={() => setPreviewAsset(null)} onCopy={copyAssetText} onDownload={downloadImage} />
+            <AssetDrawer asset={previewAsset} onClose={() => setPreviewAsset(null)} onCopy={copyAssetText} onDownload={(asset) => void downloadImage(asset)} />
 
             <input ref={assetInputRef} type="file" accept="application/zip,.zip" className="hidden" onChange={(event) => void importAssetZip(event.target.files?.[0])} />
 

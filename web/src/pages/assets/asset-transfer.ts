@@ -42,7 +42,7 @@ export async function exportAssets(assets: Asset[], filename: string) {
     saveAs(zip, filename);
 }
 
-export async function readAssetPackage(file: File) {
+export async function readAssetPackage(file: Blob) {
     const zip = await readZip(file);
     const assetFile = zip.get("assets.json");
     if (!assetFile) throw new Error("missing assets.json");

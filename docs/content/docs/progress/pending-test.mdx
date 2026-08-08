@@ -7,6 +7,9 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+- Google Drive desktop OAuth: import a Google Cloud Desktop app OAuth JSON (or manually enter its matching Client ID and Client Secret), complete authorization in the system browser, and verify the browser reports success only after the token reaches the desktop app. The app should immediately show the signed-in account, recursively list files from the configured shared folder or shared drive, refresh without reopening OAuth, display the exact token-exchange error, and clear the session after Sign out.
+- Windows desktop packaging: run `npm run desktop:build` from `web`, then verify local canvas, image generation, and video generation in the installed application.
+- Desktop API access: fetch models and generate media through an OpenAI-compatible endpoint that rejects browser CORS preflight requests.
 - English and Simplified Chinese switching across navigation, settings, titles, descriptions, Ant Design components, and persisted preferences.
 - Global Dropdown, Menu, Select, Cascader, and TreeSelect popup backgrounds, hover states, and selected states in both light and dark themes.
 - Canvas node resize stability, prompt scrolling, generated-prompt restoration, image editing, drag-and-drop references, and generation configuration.
@@ -15,5 +18,6 @@ The current release needs manual verification in these areas:
 - Agent message layout, Markdown, code blocks, attachments, token statistics, progress timelines, command groups, and scroll-follow behavior.
 - Prompt Center layout, source synchronization, search, asset insertion, prompt detail dialogs, and compact split-layout prompt pickers in the image and video workbenches.
 - Settings import/export, Volcengine Ark protocol handling, and WebDAV-related configuration.
+- Google Drive team library: configure a Google Desktop OAuth Client ID, its matching Client Secret, and the shared published-folder ID; connect a permitted Google account, refresh the folder, and import canvas ZIPs, asset ZIPs, and prompt JSON files. Confirm users without folder access are rejected and the optional Google Form link opens without granting Drive write access.
 
 The Chinese version contains the complete item-by-item acceptance checklist.
