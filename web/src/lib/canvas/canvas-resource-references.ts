@@ -5,6 +5,7 @@ import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { imageToDataUrl } from "@/services/image-storage";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData } from "@/types/canvas";
+import { getElementGroupMembers } from "./canvas-element-groups";
 
 export type CanvasResourceKind = "image" | "video" | "audio" | "text";
 
@@ -20,7 +21,8 @@ export type CanvasResourceReference = {
 };
 
 export function buildNodeMentionReferences(node: CanvasNodeData, nodes: CanvasNodeData[], connections: CanvasConnection[]) {
-    return labelResourceNodes(getMentionResourceNodes(node.id, nodes, connections), true);
+    const resourceNodes = getMentionResourceNodes(node.id, nodes, connections).flatMap((item) => (item.type === CanvasNodeType.Group ? getElementGroupMembers(item.id, nodes) : [item]));
+    return labelResourceNodes(resourceNodes, true);
 }
 
 export function buildCanvasResourceReferences(nodes: CanvasNodeData[]) {
@@ -72,7 +74,7 @@ function getContextResourceNodes(nodeId: string, nodes: CanvasNodeData[], connec
     return connections
         .filter((connection) => connection.toNodeId === nodeId)
         .map((connection) => nodes.find((node) => node.id === connection.fromNodeId))
-        .filter((node): node is CanvasNodeData => Boolean(node && isResourceNode(node)));
+        .filter((node): node is CanvasNodeData => Boolean(node && (isResourceNode(node) || node.type === CanvasNodeType.Group)));
 }
 
 function getConnectedConfigResourceNodes(nodeId: string, nodes: CanvasNodeData[], connections: CanvasConnection[]) {

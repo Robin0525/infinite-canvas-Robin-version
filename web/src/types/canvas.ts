@@ -50,6 +50,7 @@ export type CanvasNodeMetadata = {
     reasoningEffort?: "auto" | "low" | "medium" | "high" | "xhigh";
     size?: string;
     quality?: string;
+    imageResolution?: string;
     background?: string;
     count?: number;
     seconds?: string;
@@ -64,13 +65,21 @@ export type CanvasNodeMetadata = {
     naturalWidth?: number;
     naturalHeight?: number;
     freeResize?: boolean;
+    isBatchRoot?: boolean;
+    batchRootId?: string;
+    batchChildIds?: string[];
+    batchUsesReferenceImages?: boolean;
     images?: CanvasNodeImage[];
     primaryImageId?: string;
+    imageBatchExpanded?: boolean;
     storageKey?: string;
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
     groupId?: string;
+    elementOrderIds?: string[];
+    batchEnabled?: boolean;
+    batchExecutionMode?: "concurrent" | "sequential";
     interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
 };
 

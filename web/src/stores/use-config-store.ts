@@ -47,6 +47,7 @@ export type AiConfig = {
     reasoningEffort: ReasoningEffort;
     models: string[];
     quality: string;
+    imageResolution: string;
     size: string;
     background: string;
     count: string;
@@ -59,6 +60,12 @@ export type WebdavSyncConfig = {
     password: string;
     directory: string;
     lastSyncedAt: string;
+};
+export type GoogleDriveTeamLibraryConfig = {
+    clientId: string;
+    clientSecret: string;
+    publishedFolderId: string;
+    submissionFormUrl: string;
 };
 export type ConfigTabKey = "channels" | "preferences" | "prompt-sources" | "webdav" | "local-storage";
 
@@ -105,6 +112,7 @@ export const defaultConfig: AiConfig = {
     reasoningEffort: "auto",
     models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
     quality: "auto",
+    imageResolution: "1k",
     size: "1:1",
     background: "",
     count: "1",
@@ -118,15 +126,23 @@ export const defaultWebdavSyncConfig: WebdavSyncConfig = {
     directory: "infinite-canvas",
     lastSyncedAt: "",
 };
+export const defaultGoogleDriveTeamLibraryConfig: GoogleDriveTeamLibraryConfig = {
+    clientId: "",
+    clientSecret: "",
+    publishedFolderId: "",
+    submissionFormUrl: "",
+};
 
 type ConfigStore = {
     config: AiConfig;
     webdav: WebdavSyncConfig;
+    googleDriveTeamLibrary: GoogleDriveTeamLibraryConfig;
     isConfigOpen: boolean;
     configTab: ConfigTabKey;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
+    updateGoogleDriveTeamLibrary: <K extends keyof GoogleDriveTeamLibraryConfig>(key: K, value: GoogleDriveTeamLibraryConfig[K]) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -191,6 +207,7 @@ export const useConfigStore = create<ConfigStore>()(
         (set, get) => ({
             config: defaultConfig,
             webdav: defaultWebdavSyncConfig,
+            googleDriveTeamLibrary: defaultGoogleDriveTeamLibraryConfig,
             isConfigOpen: false,
             configTab: "channels",
             shouldPromptContinue: false,
@@ -208,6 +225,13 @@ export const useConfigStore = create<ConfigStore>()(
                         [key]: value,
                     },
                 })),
+            updateGoogleDriveTeamLibrary: (key, value) =>
+                set((state) => ({
+                    googleDriveTeamLibrary: {
+                        ...state.googleDriveTeamLibrary,
+                        [key]: value,
+                    },
+                })),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false, configTab = "channels") => set({ isConfigOpen: true, shouldPromptContinue, configTab }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -215,11 +239,12 @@ export const useConfigStore = create<ConfigStore>()(
         }),
         {
             name: CONFIG_STORE_KEY,
-            partialize: (state) => ({ config: state.config, webdav: state.webdav }),
+            partialize: (state) => ({ config: state.config, webdav: state.webdav, googleDriveTeamLibrary: state.googleDriveTeamLibrary }),
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
                 const persistedWebdav = (persistedState.webdav || {}) as Partial<WebdavSyncConfig>;
+                const persistedGoogleDriveTeamLibrary = (persistedState.googleDriveTeamLibrary || {}) as Partial<GoogleDriveTeamLibraryConfig>;
                 const config = { ...defaultConfig, ...persistedConfig };
                 if (!Array.isArray(persistedConfig.channels)) config.channels = [];
                 const channels = normalizeChannels(config);
@@ -227,6 +252,7 @@ export const useConfigStore = create<ConfigStore>()(
                 return {
                     ...current,
                     webdav: { ...defaultWebdavSyncConfig, ...persistedWebdav },
+                    googleDriveTeamLibrary: { ...defaultGoogleDriveTeamLibraryConfig, ...persistedGoogleDriveTeamLibrary },
                     config: {
                         ...config,
                         channelMode: "local",
@@ -242,6 +268,7 @@ export const useConfigStore = create<ConfigStore>()(
                         audioSpeed: config.audioSpeed || defaultConfig.audioSpeed,
                         audioInstructions: config.audioInstructions || "",
                         reasoningEffort: config.reasoningEffort || "auto",
+                        imageResolution: config.imageResolution || legacyImageResolution(config.quality),
                         videoSeconds: config.videoSeconds || "6",
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "true",
@@ -331,7 +358,18 @@ export function resolveModelChannel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
     const model = decoded?.model || value;
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.some((item) => item.name === model));
-    return matched || config.channels[0] || createModelChannel({ id: "default", name: i18n.t("config.channels.defaultName"), baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })) });
+    return (
+        matched ||
+        config.channels[0] ||
+        createModelChannel({
+            id: "default",
+            name: i18n.t("config.channels.defaultName"),
+            baseUrl: config.baseUrl,
+            apiKey: config.apiKey,
+            apiFormat: config.apiFormat,
+            models: config.models.map(modelOptionName).map((name) => ({ name, capability: guessCapability(name) })),
+        })
+    );
 }
 
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
@@ -389,6 +427,14 @@ export function buildApiUrl(baseUrl: string, path: string) {
     normalizedBaseUrl = normalizeArkPlanBaseUrl(normalizedBaseUrl);
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     const apiBaseUrl = lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/api/v3") || lowerBaseUrl.endsWith("/api/plan/v3") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
+    const developmentProxyTarget = import.meta.env.VITE_DEV_API_PROXY_TARGET?.replace(/\/+$/, "");
+
+    // The development server can proxy one CORS-restricted provider so the same
+    // browser UI can be tested locally. Packaged desktop builds use native HTTP.
+    if (import.meta.env.DEV && developmentProxyTarget && apiBaseUrl.startsWith(developmentProxyTarget)) {
+        return `${window.location.origin}/api-proxy${apiBaseUrl.slice(developmentProxyTarget.length)}${path}`;
+    }
+
     return `${apiBaseUrl}${path}`;
 }
 
@@ -408,4 +454,10 @@ function normalizeArkPlanBaseUrl(baseUrl: string) {
     } catch {
         return baseUrl;
     }
+}
+
+function legacyImageResolution(quality: string | undefined) {
+    if (quality === "high" || quality === "4k") return "4k";
+    if (quality === "medium" || quality === "hd" || quality === "2k") return "2k";
+    return "1k";
 }

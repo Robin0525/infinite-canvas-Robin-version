@@ -1,0 +1,22 @@
+[package]
+name = "infinite-canvas-desktop"
+version = "0.15.2"
+description = "Infinite Canvas Windows desktop application"
+authors = ["Infinite Canvas contributors"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-http = "2"
+base64 = "0.22"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+url = "2"
+urlencoding = "2"
