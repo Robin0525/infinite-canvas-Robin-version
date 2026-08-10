@@ -1,7 +1,5 @@
-import type { ReactNode } from "react";
-import { Compass, Focus, HelpCircle } from "lucide-react";
-import { useState } from "react";
-import { Button, Modal, Tooltip } from "antd";
+import { Compass, Focus, LayoutDashboard } from "lucide-react";
+import { Button, Tooltip } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -13,10 +11,10 @@ type CanvasZoomControlsProps = {
     onReset: () => void;
     isMiniMapOpen: boolean;
     onToggleMiniMap: () => void;
+    onAutoArrange: () => void;
 };
 
-export function CanvasZoomControls({ scale, onScaleChange, onReset, isMiniMapOpen, onToggleMiniMap }: CanvasZoomControlsProps) {
-    const [shortcutsOpen, setShortcutsOpen] = useState(false);
+export function CanvasZoomControls({ scale, onScaleChange, onReset, isMiniMapOpen, onToggleMiniMap, onAutoArrange }: CanvasZoomControlsProps) {
     const { t } = useTranslation();
     const colorTheme = useThemeStore((state) => state.theme);
     const theme = canvasThemes[colorTheme];
@@ -55,36 +53,10 @@ export function CanvasZoomControls({ scale, onScaleChange, onReset, isMiniMapOpe
                 <span className="w-10 text-right text-xs tabular-nums" style={{ color: theme.node.muted }}>
                     {Math.round(scale * 100)}%
                 </span>
-                <Tooltip title={t("canvas.shortcuts")}>
-                    <Button
-                        type="text"
-                        className="!h-8 !w-8 !min-w-8 !p-0"
-                        style={shortcutsOpen ? activeStyle : { color: theme.toolbar.item }}
-                        icon={<HelpCircle className="size-4" />}
-                        onClick={() => setShortcutsOpen(true)}
-                        aria-label={t("canvas.shortcuts")}
-                    />
+                <Tooltip title={t("canvas.autoArrange.title")}>
+                    <Button type="text" className="!h-8 !w-8 !min-w-8 !p-0" style={{ color: theme.toolbar.item }} icon={<LayoutDashboard className="size-4" />} onClick={onAutoArrange} aria-label={t("canvas.autoArrange.title")} />
                 </Tooltip>
             </div>
-            <Modal title={t("canvas.shortcuts")} open={shortcutsOpen} onCancel={() => setShortcutsOpen(false)} footer={null} centered>
-                <div className="space-y-3 border-t pt-4 text-sm" style={{ borderColor: theme.node.stroke }}>
-                    <Shortcut label={`Space + ${t("canvas.shortcut.drag")}`} value={t("canvas.shortcut.dragCanvas")} />
-                    <Shortcut label={t("canvas.shortcut.wheel")} value={t("canvas.shortcut.zoom")} />
-                    <Shortcut label={`Ctrl + ${t("canvas.shortcut.drag")}`} value={t("canvas.shortcut.boxSelect")} />
-                    <Shortcut label={`Shift / Cmd + ${t("canvas.shortcut.click")}`} value={t("canvas.shortcut.addSelection")} />
-                    <Shortcut label="Ctrl / Cmd + C / V" value={t("canvas.shortcut.copyPasteNodes")} />
-                    <Shortcut label="Delete / Backspace" value={t("canvas.shortcut.delete")} />
-                </div>
-            </Modal>
-        </div>
-    );
-}
-
-function Shortcut({ label, value }: { label: ReactNode; value: string }) {
-    return (
-        <div className="flex items-center justify-between gap-4">
-            <span className="text-base font-medium">{label}</span>
-            <span className="opacity-60">{value}</span>
         </div>
     );
 }

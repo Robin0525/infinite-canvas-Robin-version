@@ -7,8 +7,18 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+- Version dialog: clicking the desktop version number shows detailed v0.15.3 and Unreleased entries. The embedded changelog remains available offline, while update checks and the GitHub shortcut target `Robin0525/infinite-canvas-Robin-version`.
+- Batch run semantics: enabling batch mode resets the image count control to 1 run. With element groups of 2 and 3 members, 1 run produces exactly one 6-image row, while 2 runs produce two separate 6-image rows without a duplicated root image.
+- Repeated generation layout and scheduling: clicking Generate again places the new result group below all prior groups. Concurrent mode starts up to 10 independent requests together, while sequential mode does not submit the next request until the previous result is saved.
+- Element-group deletion: deleting one or more misaligned members immediately compacts the remaining members in their saved order without resizing the group.
+- Filled video deletion: focus or play a video node, select it, then press Delete or Backspace; the node and its connections should be removed just like an empty video node.
+- Batch confirmation and execution: canceling the confirmation must submit nothing; confirming must show the correct combination, per-combination, and total counts. Sequential mode must wait for each saved result before the next request, while concurrent mode with 3 fixed images and a 5-text element group must issue 5 independent combinations rather than collaging prompts.
+- Batch gateway recovery: transient 429/502/503 responses should retry with backoff up to twice and persistent failures should display the localized upstream/gateway explanation without stopping other concurrent combinations.
+- Canvas auto-arrange: the bottom-left former shortcut slot should arrange the whole connected workflow from a single selection or only the selected atoms from a multi-selection; groups and batch result sets move as units and one Undo restores the previous layout.
+- Media frame stability: importing, replacing, or generating media into an empty image/video node must preserve that node's width, height, and position.
 - Canvas shortcuts: Ctrl-drag selects intersecting nodes, Space + left-drag pans, and both shortcut dialogs show translated labels.
 - Element groups: add multiple local image, video, audio, and text files from the hover toolbar; drag one or more canvas nodes into or out of a group; verify ordered grid layout and automatic group numbering.
+- Codex element-group tools: create a group from existing nodes, add/remove/reorder members, connect one or more groups to a generation config, and verify concurrent and sequential batch modes.
 - Windows Robin Version branding: the desktop header hides Documentation, the window title is “无限画布 Robin Version”, and the executable, shortcut, taskbar, and installer use the new icon.
 - Google Drive desktop OAuth: import a Google Cloud Desktop app OAuth JSON (or manually enter its matching Client ID and Client Secret), complete authorization in the system browser, and verify the browser reports success only after the token reaches the desktop app. The app should immediately show the signed-in account, recursively list files from the configured shared folder or shared drive, refresh without reopening OAuth, display the exact token-exchange error, and clear the session after Sign out.
 - Windows desktop packaging: run `npm run desktop:build` from `web`, then verify local canvas, image generation, and video generation in the installed application.

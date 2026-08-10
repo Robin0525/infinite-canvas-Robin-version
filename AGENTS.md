@@ -1,5 +1,7 @@
 # AGENTS.md
 
+- 本项目的唯一主仓库是 `D:\document\ChatGPT\无限画板开发\infinite-canvas-desktop-robin-version`；后续开发、插件升级、构建与发布均只使用该目录，不再修改同级旧仓库 `infinite-canvas-desktop`。
+
 本文档用于约束本项目中的 AI / 自动化开发行为。开发时优先遵循本文件，其次遵循用户当前消息。
 
 ## 基本原则

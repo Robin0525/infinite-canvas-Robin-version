@@ -1,54 +1,54 @@
 ---
 name: open-canvas
-description: 打开 Infinite Canvas 在线或本地画布，并自动连接本地 Canvas Agent。用户要求打开、启动、进入或使用 Infinite Canvas 画布时使用。
+description: 打开 Infinite Canvas 本地桌面画布，并自动连接 Robin Version 主仓库中的本地 Canvas Agent。
 ---
 
 # Open Infinite Canvas
 
-默认使用已安装的 Windows 桌面版；不要打开上游在线站点。只有用户明确要求使用浏览器开发模式时，才启动本地前端。
+默认使用已安装的 Windows 桌面版，不打开上游在线站点。只有用户明确要求浏览器开发模式时，才启动本地前端。
+
+## 主仓库
+
+唯一主仓库为：
+
+```text
+D:\document\ChatGPT\无限画板开发\infinite-canvas-desktop-robin-version
+```
+
+不要使用同级旧目录 `infinite-canvas-desktop`。
 
 ## Windows 桌面版
 
-1. 启动本地 Canvas Agent 并保持运行：
+1. 若本地 Agent 尚未构建，在主仓库的 `canvas-agent` 目录执行 `npm install` 与 `npm run build`。
+2. 启动本地主仓库版本 Canvas Agent 并保持运行：
 
-```bash
-npx -y @basketikun/canvas-agent
+```powershell
+node "D:\document\ChatGPT\无限画板开发\infinite-canvas-desktop-robin-version\canvas-agent\dist\index.js"
 ```
 
-2. 从启动输出取得 `Local URL` 和 `Connect token`。
+3. 从启动输出取得 `Local URL` 和 `Connect token`。
+4. 打开 `C:\Users\33423\AppData\Local\无限画板\infinite-canvas-desktop.exe`，在 Agent 面板填入连接信息。
 
-3. 打开「无限画板」Windows 桌面版，在 Agent 面板输入 `Local URL` 和 `Connect token` 后连接。
+## 浏览器开发模式
 
-## 本地版
+在主仓库中启动前端，再启动同一个本地 Agent：
 
-1. 在 Infinite Canvas 项目中启动前端，并使用 Vite 输出的 `Local` 地址：
-
-```bash
-cd web
-bun install
-bun run dev
+```powershell
+cd "D:\document\ChatGPT\无限画板开发\infinite-canvas-desktop-robin-version\web"
+npm run dev
 ```
 
-2. 启动本地 Canvas Agent：
-
-```bash
-npx -y @basketikun/canvas-agent
-```
-
-3. 从启动输出取得 `Local URL` 和 `Connect token`，在 Codex 右侧浏览器打开：
+使用 Vite 输出的本地地址，并按需附加：
 
 ```text
-<Vite Local 地址>/canvas?mode=new&agentUrl=<Local URL>&agentToken=<Connect token>
+/canvas?mode=new&agentUrl=<Local URL>&agentToken=<Connect token>
 ```
 
 ## MCP 与连接地址
 
-插件在新的 Codex 任务中加载时会自动启动 `npx -y @basketikun/canvas-agent mcp`。这个 MCP 进程负责提供画布工具，不提供桌面应用连接服务；
-因此还需要启动上面所示的普通 Canvas Agent，再把它输出的 `Local URL` 和 `Connect token` 填入桌面版 Agent 面板。两个进程读取同一份本地配置。
+插件在新的 Codex 会话中直接运行主仓库构建产物 `canvas-agent/dist/index.js mcp`，以便应用功能与 Codex 工具保持同一版本。普通 Canvas Agent 服务和 MCP 进程读取同一份本地连接配置。
 
-## 打开模式
-
-用户没有明确指定打开方式时，始终使用 `mode=new` 新建画布。只有用户明确要求时才替换为：
+用户未指定打开方式时使用 `mode=new`。只有明确要求时改用：
 
 - 最近画布：`mode=recent`
 - 自己选择：`mode=choose`

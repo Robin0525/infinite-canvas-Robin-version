@@ -62,6 +62,31 @@ test("画布写操作只发送给当前激活网页", async (t) => {
     assert.deepEqual(await result, { ok: true });
 });
 
+test("Canvas Agent 可创建带有有序成员的元素组", async (t) => {
+    const session = new CanvasSession();
+    const client = connect(session, "first");
+    t.after(() => client.close());
+    session.updateState({
+        ...snapshot("canvas-groups"),
+        nodes: [
+            { id: "image-1", type: "image", title: "产品图", position: { x: 0, y: 0 }, width: 320, height: 320 },
+            { id: "text-1", type: "text", title: "卖点", position: { x: 360, y: 0 }, width: 320, height: 240 },
+        ],
+    }, "first");
+
+    const result = session.callTool("canvas_create_element_group", { title: "产品素材", memberNodeIds: ["image-1", "text-1"] });
+    const call = client.event("tool_call");
+    const ops = field(field(call, "input"), "ops") as Array<Record<string, unknown>>;
+    assert.equal(field(call, "name"), "canvas_apply_ops");
+    assert.equal(field(ops[0], "nodeType"), "group");
+    assert.equal(field(ops[1], "type"), "update_node");
+    assert.deepEqual(field(field(ops[1], "metadata"), "elementOrderIds"), ["image-1", "text-1"]);
+    assert.equal(field(field(ops[2], "metadata"), "groupId"), field(ops[0], "id"));
+    assert.equal(field(field(ops[3], "metadata"), "groupId"), field(ops[0], "id"));
+    session.resolveResult("first", { requestId: String(field(call, "requestId")), result: { ok: true } });
+    assert.deepEqual(await result, { ok: true });
+});
+
 test("当前 turn 的图片附件可在发起标签页画布创建图片节点", async (t) => {
     const session = new CanvasSession();
     const first = connect(session, "first");

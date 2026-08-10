@@ -118,7 +118,12 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, groupCoun
                             onChange={(batchExecutionMode) => onConfigChange(node.id, { batchExecutionMode: batchExecutionMode as "concurrent" | "sequential" })}
                         />
                     ) : null}
-                    <Switch size="small" checked={Boolean(node.metadata?.batchEnabled)} disabled={!groupCount || !["image", "video"].includes(mode)} onChange={(batchEnabled) => onConfigChange(node.id, { batchEnabled })} />
+                    <Switch
+                        size="small"
+                        checked={Boolean(node.metadata?.batchEnabled)}
+                        disabled={!groupCount || !["image", "video"].includes(mode)}
+                        onChange={(batchEnabled) => onConfigChange(node.id, { batchEnabled, ...(batchEnabled ? { count: 1 } : {}) })}
+                    />
                 </span>
             </div>
 
@@ -134,6 +139,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, groupCoun
                 ) : mode === "image" ? (
                     <CanvasImageSettingsPopover
                         config={config}
+                        countMode={node.metadata?.batchEnabled ? "runs" : "images"}
                         placement="topRight"
                         autoAdjustOverflow={false}
                         buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2"

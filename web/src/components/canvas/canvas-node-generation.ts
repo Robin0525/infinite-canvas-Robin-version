@@ -147,8 +147,9 @@ export function buildBatchGenerationContexts(nodeId: string, nodes: CanvasNodeDa
     if (!connectedGroups.length) return [buildNodeGenerationContext(nodeId, nodes, connections, prompt)];
     const groups = getBatchElementGroups(nodeId, nodes, connections, prompt);
     const connectedIds = new Set(connectedGroups.map(({ group }) => group.id));
+    const batchMemberIds = new Set(groups.flatMap(({ members }) => members.map((member) => member.id)));
     const groupLabelById = new Map(connectedGroups.map(({ group }, index) => [group.id, i18n.t("canvas.elementGroup.groupLabel", { index: index + 1 })]));
-    const constantNodes = getGenerationResourceNodes(nodeId, nodes, connections).filter((node) => !connectedIds.has(node.id) && node.type !== CanvasNodeType.Group);
+    const constantNodes = getGenerationResourceNodes(nodeId, nodes, connections).filter((node) => !connectedIds.has(node.id) && !batchMemberIds.has(node.id) && node.type !== CanvasNodeType.Group);
     const constants = constantNodes.flatMap((node) => generationInputFromNode(node));
     const batchTokenLabels = new Map(constants.map((input) => [input.nodeId, input.title]));
     connectedGroups.forEach(({ group, members }) => {

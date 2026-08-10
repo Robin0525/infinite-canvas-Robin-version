@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { App } from "antd";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "@/constant/env";
-import { parseChangelog, type ReleaseInfo } from "@/lib/release";
+import type { ReleaseInfo } from "@/lib/release";
 
-const releasesUrl = "https://api.github.com/repos/Robin0525/infinite-canvas-Ro-version/releases?per_page=20";
+const releasesUrl = "https://api.github.com/repos/Robin0525/infinite-canvas-Robin-version/releases?per_page=20";
 type GithubRelease = { tag_name?: string; name?: string; body?: string; published_at?: string; created_at?: string; draft?: boolean; prerelease?: boolean };
 
 function readLocalReleases(): ReleaseInfo[] {
@@ -28,7 +28,10 @@ function releaseItems(body: string) {
         .split("\n")
         .map((line) => line.replace(/^\s*[-*+]\s*/, "").trim())
         .filter(Boolean)
-        .map((content) => ({ type: "更新", content }));
+        .map((content) => {
+            const match = content.match(/^\[(.+?)\]\s+(.+)$/);
+            return match ? { type: match[1], content: match[2] } : { type: "更新", content };
+        });
 }
 
 function mapRelease(release: GithubRelease): ReleaseInfo | null {
@@ -42,7 +45,10 @@ async function fetchReleases() {
     const response = await fetch(releasesUrl);
     if (!response.ok) throw new Error("release request failed");
     const data = (await response.json()) as GithubRelease[];
-    return data.filter((release) => !release.draft && !release.prerelease).map(mapRelease).filter((release): release is ReleaseInfo => Boolean(release));
+    return data
+        .filter((release) => !release.draft && !release.prerelease)
+        .map(mapRelease)
+        .filter((release): release is ReleaseInfo => Boolean(release));
 }
 
 export function useVersionCheck() {

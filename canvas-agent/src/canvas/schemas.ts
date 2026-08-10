@@ -3,7 +3,7 @@ import { z } from "zod";
 const recordSchema = z.record(z.unknown());
 const positionSchema = z.object({ x: z.number(), y: z.number() });
 const viewportSchema = z.object({ x: z.number(), y: z.number(), k: z.number() });
-const nodeTypeSchema = z.enum(["image", "text", "config", "video", "audio"]);
+const nodeTypeSchema = z.enum(["image", "text", "config", "video", "audio", "group"]);
 const generationModeSchema = z.enum(["text", "image", "video", "audio"]);
 
 /** Canvas Agent 对外提供的工具名称。 */
@@ -19,6 +19,9 @@ export const toolNames = [
     "canvas_create_text_node",
     "canvas_create_text_nodes",
     "canvas_create_config_node",
+    "canvas_create_element_group",
+    "canvas_set_element_group_members",
+    "canvas_configure_batch_generation",
     "canvas_create_image_prompt_flow",
     "canvas_create_generation_flow",
     "canvas_generate_text",
@@ -78,6 +81,8 @@ const generationOptionsSchema = z.object({
     audioFormat: z.string().optional(),
     audioSpeed: z.string().optional(),
     audioInstructions: z.string().optional(),
+    batchEnabled: z.boolean().optional(),
+    batchExecutionMode: z.enum(["concurrent", "sequential"]).optional(),
 });
 
 const generationFlowSchema = z.object({
@@ -100,6 +105,9 @@ export const toolInputSchemas = {
     canvas_create_text_node: z.object({ text: z.string().optional(), x: z.number().optional(), y: z.number().optional(), title: z.string().optional(), width: z.number().optional(), height: z.number().optional() }),
     canvas_create_text_nodes: z.object({ items: z.array(textNodeSchema).min(1), x: z.number().optional(), y: z.number().optional(), gap: z.number().optional(), direction: z.enum(["row", "column"]).optional() }),
     canvas_create_config_node: z.object({ prompt: z.string().optional(), mode: generationModeSchema.optional(), title: z.string().optional(), x: z.number().optional(), y: z.number().optional(), width: z.number().optional(), height: z.number().optional(), autoRun: z.boolean().optional() }).merge(generationOptionsSchema),
+    canvas_create_element_group: z.object({ title: z.string().optional(), x: z.number().optional(), y: z.number().optional(), width: z.number().optional(), height: z.number().optional(), memberNodeIds: z.array(z.string()).optional() }),
+    canvas_set_element_group_members: z.object({ groupId: z.string(), memberNodeIds: z.array(z.string()) }),
+    canvas_configure_batch_generation: z.object({ configNodeId: z.string(), groupIds: z.array(z.string()).min(1), enabled: z.boolean().optional(), executionMode: z.enum(["concurrent", "sequential"]).optional() }),
     canvas_create_image_prompt_flow: z.object({ prompt: z.string(), x: z.number().optional(), y: z.number().optional(), autoRun: z.boolean().optional() }).merge(generationOptionsSchema),
     canvas_create_generation_flow: generationFlowSchema.extend({ mode: generationModeSchema.optional(), autoRun: z.boolean().optional() }).merge(generationOptionsSchema),
     canvas_generate_text: generationFlowSchema.merge(generationOptionsSchema),
@@ -131,12 +139,15 @@ export const toolDescriptions: Record<ToolName, string> = {
     canvas_get_state: "读取当前网页画布的节点、连线、选区和视口。",
     canvas_get_selection: "读取当前网页画布选中的节点。",
     canvas_export_snapshot: "导出当前画布快照，用于理解布局。",
-    canvas_apply_ops: "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation。",
-    canvas_create_node: "创建任意类型节点：text、image、config、video、audio。适合创建占位图、媒体占位、配置节点或自定义 metadata 节点。",
+    canvas_apply_ops: "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation。元素组成员请使用 canvas_set_element_group_members。",
+    canvas_create_node: "创建任意类型节点：text、image、config、video、audio、group。适合创建占位图、媒体占位、配置节点、元素组或自定义 metadata 节点。",
     canvas_create_attachment_nodes: "把当前对话中用户上传的图片附件创建成真实画布图片节点。attachmentIds 使用本轮附件清单中的 ID；返回的节点 ID 可传给 canvas_create_generation_flow.referenceNodeIds 作为生成参考图。",
     canvas_create_text_node: "在当前画布创建单个文本节点。",
     canvas_create_text_nodes: "批量创建文本节点，适合生成标题、段落、脚本、说明等内容块。",
     canvas_create_config_node: "创建生成配置节点，可指定 text/image/video/audio 模式和生成参数，可选择立即触发生成。",
+    canvas_create_element_group: "创建元素组，可同时把已有图片、视频、音频或文本节点按 memberNodeIds 顺序加入组内并自动布局。",
+    canvas_set_element_group_members: "精确设置元素组成员及顺序。传入完整 memberNodeIds；可用于加入、移出和重排成员，空数组会清空元素组。",
+    canvas_configure_batch_generation: "为生成配置启用元素组批量处理并连接一个或多个元素组，可选择并发 concurrent 或依次 sequential 执行。",
     canvas_create_image_prompt_flow: "创建提示词文本节点和图片生成配置节点，并自动连线，可选择立即触发生图。",
     canvas_create_generation_flow: "创建通用生成流程：提示词文本节点、生成配置节点、参考节点连线，可用于文案、生图、视频或音频。",
     canvas_generate_text: "创建通用文本生成流程并立即触发生成。",

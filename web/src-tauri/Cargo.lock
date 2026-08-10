@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "infinite-canvas-desktop"
-version = "0.15.2"
+version = "0.15.3"
 dependencies = [
  "base64 0.22.1",
  "rand 0.8.7",

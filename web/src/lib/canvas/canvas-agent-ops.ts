@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
 import { getNodeSpec, isRegisteredNodeType } from "@/lib/canvas/node-registry";
+import { layoutAllElementGroups, syncElementGroupOrders } from "@/lib/canvas/canvas-element-groups";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type ViewportTransform } from "@/types/canvas";
 
 export type CanvasAgentOp =
@@ -64,6 +65,7 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
         if (op.type === "delete_node") {
             const ids = new Set(op.ids || (op.id ? [op.id] : op.nodeType ? nodes.filter((node) => node.type === op.nodeType).map((node) => node.id) : []));
             nodes = nodes.filter((node) => !ids.has(node.id));
+            nodes = nodes.map((node) => (node.metadata?.groupId && ids.has(node.metadata.groupId) ? { ...node, metadata: { ...node.metadata, groupId: undefined } } : node));
             connections = connections.filter((conn) => !ids.has(conn.fromNodeId) && !ids.has(conn.toNodeId));
             selectedNodeIds = selectedNodeIds.filter((id) => !ids.has(id));
         }
@@ -81,6 +83,7 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
         if (op.type === "select_nodes") selectedNodeIds = (op.ids || []).filter((id) => nodes.some((node) => node.id === id));
     });
 
+    nodes = layoutAllElementGroups(syncElementGroupOrders(nodes));
     return { ...snapshot, nodes, connections, selectedNodeIds, viewport };
 }
 
