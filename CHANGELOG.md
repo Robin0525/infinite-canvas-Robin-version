@@ -9,6 +9,7 @@
 - [修复] Windows 客户端最顶部原生窗口标题跟随语言实时切换为“无限画布 Robin Version”或“Infinite Canvas Robin Version”。
 - [调整] Windows 安装包携带 Robin Version Codex 插件市场快照，插件 MCP 和手动 Canvas Agent 命令改为从 `Robin0525/infinite-canvas-Robin-version` 获取最新版，连接面板展示内置插件或 GitHub 仓库的可复制安装命令，不再依赖开发机绝对路径。
 - [修复] 多张及批量图片生成恢复独立总览节点，实际生成结果全部作为子节点保留；总览按成功图片自动生成最多九宫格，双击总览只展开或收起结果，双击实际图片正常打开大图预览。
+- [新增] Windows 桌面端检测到 GitHub 最新版本高于当前版本时，在“检查更新”下显示“立即更新”；客户端直接下载 Release 中的 x64 EXE、显示进度、校验文件大小与 SHA-256，完成后自动退出当前客户端并启动安装程序。
 
 ## v0.15.3 - 2026-08-09
 

@@ -925,6 +925,12 @@ export default {
         changelogFailed: "更新日志读取失败",
         updated: "已获取最新版本信息",
         updateFailed: "获取最新版本信息失败",
+        available: "已有新版本 {{version}}",
+        installNow: "立即更新",
+        downloading: "正在下载 {{progress}}%",
+        desktopOnly: "请在 Windows 桌面客户端中使用自动更新",
+        installerMissing: "该版本暂未提供 Windows 安装包",
+        installFailed: "更新下载或启动失败，请稍后重试",
         types: { added: "新增", fixed: "修复", changed: "调整", optimized: "优化", docs: "文档" },
     },
     config: {

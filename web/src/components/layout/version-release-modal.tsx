@@ -1,9 +1,11 @@
 import type { CSSProperties } from "react";
-import { Modal, Tag, Timeline } from "antd";
+import { App, Button, Modal, Progress, Tag, Timeline } from "antd";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useVersionCheck } from "@/hooks/use-version-check";
 import { APP_VERSION } from "@/constant/env";
+import { downloadAndInstallUpdate, isDesktopUpdaterAvailable } from "@/services/desktop-updater";
+import { useState } from "react";
 
 function getTagColor(type: string) {
     if (type === "新增" || type === "Added") return "green";
@@ -25,7 +27,24 @@ type VersionReleaseModalProps = {
 
 export function VersionReleaseModal({ className, style }: VersionReleaseModalProps) {
     const { t } = useTranslation();
-    const { open, setOpen, openReleaseModal, latestVersion, releases, checking, hasNewVersion, checkLatestRelease } = useVersionCheck();
+    const { message } = App.useApp();
+    const { open, setOpen, openReleaseModal, latestVersion, latestInstaller, releases, checking, hasNewVersion, checkLatestRelease } = useVersionCheck();
+    const [updating, setUpdating] = useState(false);
+    const [updateProgress, setUpdateProgress] = useState(0);
+    const desktopUpdaterAvailable = isDesktopUpdaterAvailable();
+
+    const installLatestVersion = async () => {
+        if (!latestInstaller || updating) return;
+        setUpdating(true);
+        setUpdateProgress(0);
+        try {
+            await downloadAndInstallUpdate(latestInstaller, ({ percent }) => setUpdateProgress(percent));
+        } catch (error) {
+            console.error(error);
+            message.error(t("version.installFailed"));
+            setUpdating(false);
+        }
+    };
 
     return (
         <>
@@ -41,7 +60,7 @@ export function VersionReleaseModal({ className, style }: VersionReleaseModalPro
                     {hasNewVersion ? <span className="absolute -right-1.5 -top-1 size-1.5 rounded-full bg-green-500" /> : null}
                 </span>
             </button>
-            <Modal title={t("version.title")} open={open} width={680} centered footer={null} onCancel={() => setOpen(false)}>
+            <Modal title={t("version.title")} open={open} width={680} centered footer={null} closable={!updating} maskClosable={!updating} onCancel={() => !updating && setOpen(false)}>
                 <div className="mb-5 grid grid-cols-2 gap-3">
                     <div className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
                         <div className="text-xs text-stone-500 dark:text-stone-400">{t("version.currentVersion")}</div>
@@ -59,6 +78,16 @@ export function VersionReleaseModal({ className, style }: VersionReleaseModalPro
                             </button>
                         </div>
                         <div className="mt-1 text-base font-semibold text-stone-950 dark:text-stone-100">{latestVersion}</div>
+                        {hasNewVersion ? (
+                            <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-800">
+                                <div className="text-xs font-medium text-green-600 dark:text-green-400">{t("version.available", { version: latestVersion })}</div>
+                                <Button className="mt-2 w-full" type="primary" disabled={!desktopUpdaterAvailable || !latestInstaller} loading={updating} onClick={() => void installLatestVersion()}>
+                                    {updating ? t("version.downloading", { progress: updateProgress }) : t("version.installNow")}
+                                </Button>
+                                {!desktopUpdaterAvailable ? <div className="mt-2 text-xs text-stone-500">{t("version.desktopOnly")}</div> : !latestInstaller ? <div className="mt-2 text-xs text-stone-500">{t("version.installerMissing")}</div> : null}
+                                {updating ? <Progress className="mb-0 mt-2" percent={updateProgress} size="small" status="active" /> : null}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
                 <div className="max-h-[56vh] overflow-y-auto pr-2">

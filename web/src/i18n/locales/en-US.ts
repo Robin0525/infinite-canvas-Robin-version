@@ -940,6 +940,12 @@ export default {
         changelogFailed: "Failed to read changelog",
         updated: "Latest version information loaded",
         updateFailed: "Failed to load the latest version information",
+        available: "New version {{version}} is available",
+        installNow: "Update now",
+        downloading: "Downloading {{progress}}%",
+        desktopOnly: "Automatic updates are available in the Windows desktop client",
+        installerMissing: "This release does not include a Windows installer",
+        installFailed: "The update could not be downloaded or started. Try again later.",
         types: { added: "Added", fixed: "Fixed", changed: "Changed", optimized: "Optimized", docs: "Docs" },
     },
     config: {

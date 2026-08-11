@@ -3,9 +3,12 @@ import { App } from "antd";
 import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "@/constant/env";
 import type { ReleaseInfo } from "@/lib/release";
+import type { UpdateInstallerAsset } from "@/services/desktop-updater";
 
 const releasesUrl = "https://api.github.com/repos/Robin0525/infinite-canvas-Robin-version/releases?per_page=20";
-type GithubRelease = { tag_name?: string; name?: string; body?: string; published_at?: string; created_at?: string; draft?: boolean; prerelease?: boolean };
+type GithubReleaseAsset = { name?: string; browser_download_url?: string; size?: number; digest?: string };
+type GithubRelease = { tag_name?: string; name?: string; body?: string; published_at?: string; created_at?: string; draft?: boolean; prerelease?: boolean; assets?: GithubReleaseAsset[] };
+type FetchedRelease = ReleaseInfo & { installer?: UpdateInstallerAsset };
 
 function readLocalReleases(): ReleaseInfo[] {
     return __APP_RELEASES__ || [];
@@ -27,18 +30,20 @@ function releaseItems(body: string) {
     return body
         .split("\n")
         .map((line) => line.replace(/^\s*[-*+]\s*/, "").trim())
-        .filter(Boolean)
+        .filter((line) => Boolean(line) && !line.startsWith("#"))
         .map((content) => {
             const match = content.match(/^\[(.+?)\]\s+(.+)$/);
             return match ? { type: match[1], content: match[2] } : { type: "更新", content };
         });
 }
 
-function mapRelease(release: GithubRelease): ReleaseInfo | null {
+function mapRelease(release: GithubRelease): FetchedRelease | null {
     const version = (release.tag_name || release.name || "").trim();
     if (!version) return null;
     const date = (release.published_at || release.created_at || "").slice(0, 10);
-    return { version, date, items: releaseItems(release.body || "") };
+    const asset = release.assets?.find((item) => /(?:x64.*setup|setup.*x64).*\.exe$/i.test(item.name || "")) || release.assets?.find((item) => /setup\.exe$/i.test(item.name || ""));
+    const installer = asset?.name && asset.browser_download_url ? { name: asset.name, url: asset.browser_download_url, size: asset.size || 0, digest: asset.digest } : undefined;
+    return { version, date, items: releaseItems(release.body || ""), installer };
 }
 
 async function fetchReleases() {
@@ -48,7 +53,7 @@ async function fetchReleases() {
     return data
         .filter((release) => !release.draft && !release.prerelease)
         .map(mapRelease)
-        .filter((release): release is ReleaseInfo => Boolean(release));
+        .filter((release): release is FetchedRelease => Boolean(release));
 }
 
 export function useVersionCheck() {
@@ -58,6 +63,7 @@ export function useVersionCheck() {
     const localReleases = useMemo(readLocalReleases, []);
     const [latestVersion, setLatestVersion] = useState(currentVersion);
     const [releases, setReleases] = useState<ReleaseInfo[]>(localReleases);
+    const [latestInstaller, setLatestInstaller] = useState<UpdateInstallerAsset | null>(null);
     const [checking, setChecking] = useState(false);
     const [open, setOpen] = useState(false);
     const hasNewVersion = isNewerVersion(latestVersion, currentVersion);
@@ -67,6 +73,7 @@ export function useVersionCheck() {
             const [latest] = await fetchReleases();
             if (!latest) return false;
             setLatestVersion(latest.version);
+            setLatestInstaller(latest.installer || null);
             return true;
         } catch {
             return false;
@@ -80,11 +87,13 @@ export function useVersionCheck() {
                 const releases = await fetchReleases();
                 if (!releases.length) throw new Error(t("version.readFailed"));
                 setLatestVersion(releases[0].version);
-                setReleases(releases);
+                setLatestInstaller(releases[0].installer || null);
+                setReleases(releases.map(({ installer: _installer, ...release }) => release));
                 if (showMessage) message.success(t("version.updated"));
                 return true;
             } catch {
                 setLatestVersion(currentVersion);
+                setLatestInstaller(null);
                 setReleases(localReleases);
                 if (showMessage) message.error(t("version.updateFailed"));
                 return false;
@@ -109,6 +118,7 @@ export function useVersionCheck() {
         setOpen,
         openReleaseModal,
         latestVersion,
+        latestInstaller,
         releases,
         checking,
         hasNewVersion,
