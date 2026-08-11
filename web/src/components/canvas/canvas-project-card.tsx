@@ -1,4 +1,4 @@
-import { Check, Copy, Download, Pencil, Trash2, X } from "lucide-react";
+import { Check, Copy, Download, FolderInput, Pencil, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { App, Button, Input, Modal } from "antd";
 import { useState } from "react";
@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useCanvasStore, type CanvasProject } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
+import { CanvasFolderSelect } from "@/components/canvas/canvas-folder-select";
 
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const { message } = App.useApp();
@@ -15,6 +16,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const [searchParams] = useSearchParams();
     const renameProject = useCanvasStore((state) => state.renameProject);
     const duplicateProject = useCanvasStore((state) => state.duplicateProject);
+    const moveProjects = useCanvasStore((state) => state.moveProjects);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
     const editingTitle = useCanvasUiStore((state) => state.editingProjectTitle);
@@ -26,6 +28,9 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     const [exporting, setExporting] = useState(false);
     const [copyOpen, setCopyOpen] = useState(false);
     const [copyTitle, setCopyTitle] = useState("");
+    const [copyFolderId, setCopyFolderId] = useState<string | undefined>();
+    const [moveOpen, setMoveOpen] = useState(false);
+    const [moveFolderId, setMoveFolderId] = useState<string | undefined>();
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
     const open = () => navigate(`/canvas/${project.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`);
@@ -50,65 +55,95 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
     };
     const openCopyDialog = () => {
         setCopyTitle(`${project.title} ${t("canvas.project.copySuffix")}`);
+        setCopyFolderId(project.folderId);
         setCopyOpen(true);
     };
     const confirmCopy = () => {
         if (!copyTitle.trim()) return;
-        duplicateProject(project.id, copyTitle);
+        duplicateProject(project.id, copyTitle, copyFolderId);
         setCopyOpen(false);
         message.success(t("canvas.project.copied"));
     };
 
-    return <>
-        <article className="group flex min-h-44 cursor-pointer flex-col justify-between rounded-2xl bg-[#f1eee8] p-5 transition hover:bg-[#ebe6dc] dark:bg-white/5 dark:hover:bg-white/10" onClick={() => !editing && open()}>
-            <div className="flex items-start gap-3">
-                <input
-                    type="checkbox"
-                    checked={selected}
-                    onClick={(event) => event.stopPropagation()}
-                    onChange={(event) => toggleSelected(project.id, event.target.checked)}
-                    className="mt-1 size-4 accent-stone-950 dark:accent-stone-100"
-                    aria-label={t("canvas.project.select", { name: project.title })}
-                />
-                {editing ? (
-                    <Input className="min-w-0" value={editingTitle} onClick={(event) => event.stopPropagation()} onChange={(event) => setEditingTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && saveTitle()} autoFocus />
-                ) : (
-                    <button
-                        type="button"
-                        className="min-w-0 cursor-pointer text-left"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            open();
-                        }}
-                    >
-                        <h2 className="truncate text-xl font-semibold">{project.title}</h2>
-                        <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
-                            {t("canvas.project.stats", { nodes: project.nodes.length, connections: project.connections.length })}
-                        </p>
-                    </button>
-                )}
-            </div>
-            <div className="mt-8 flex items-end justify-between gap-3">
-                <p className="text-xs text-stone-500">{t("canvas.project.updated", { date: new Date(project.updatedAt).toLocaleString(i18n.resolvedLanguage, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) })}</p>
-                <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+    return (
+        <>
+            <article className="group flex min-h-44 cursor-pointer flex-col justify-between rounded-2xl bg-[#f1eee8] p-5 transition hover:bg-[#ebe6dc] dark:bg-white/5 dark:hover:bg-white/10" onClick={() => !editing && open()}>
+                <div className="flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => toggleSelected(project.id, event.target.checked)}
+                        className="mt-1 size-4 accent-stone-950 dark:accent-stone-100"
+                        aria-label={t("canvas.project.select", { name: project.title })}
+                    />
                     {editing ? (
-                        <>
-                            <Button type="text" size="small" shape="circle" icon={<Check className="size-4" />} onClick={saveTitle} aria-label={t("canvas.project.saveName")} />
-                            <Button type="text" size="small" shape="circle" icon={<X className="size-4" />} onClick={stopEditing} aria-label={t("canvas.project.cancelRename")} />
-                        </>
+                        <Input className="min-w-0" value={editingTitle} onClick={(event) => event.stopPropagation()} onChange={(event) => setEditingTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && saveTitle()} autoFocus />
                     ) : (
-                        <>
-                            <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} loading={exporting} disabled={exporting} onClick={() => void exportProject()} aria-label={t("canvas.project.export")} />
-                            <Button type="text" size="small" shape="circle" icon={<Copy className="size-4" />} onClick={openCopyDialog} aria-label={t("canvas.project.copy")} />
-                            <Button type="text" size="small" shape="circle" icon={<Pencil className="size-4" />} onClick={() => startEditing(project.id, project.title)} aria-label={t("canvas.project.rename")} />
-                            <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-4" />} onClick={() => setDeleteIds([project.id])} aria-label={t("canvas.project.delete")} />
-                        </>
+                        <button
+                            type="button"
+                            className="min-w-0 cursor-pointer text-left"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                open();
+                            }}
+                        >
+                            <h2 className="truncate text-xl font-semibold">{project.title}</h2>
+                            <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-400">{t("canvas.project.stats", { nodes: project.nodes.length, connections: project.connections.length })}</p>
+                        </button>
                     )}
                 </div>
-            </div>
-        </article>
-        <Modal title={t("canvas.project.copyTitle")} open={copyOpen} onCancel={() => setCopyOpen(false)} onOk={confirmCopy} okButtonProps={{ disabled: !copyTitle.trim() }} okText={t("common.confirm")} cancelText={t("common.cancel")}>
-            <Input value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} onPressEnter={confirmCopy} autoFocus />
-        </Modal>
-    </>;
+                <div className="mt-8 flex items-end justify-between gap-3">
+                    <p className="text-xs text-stone-500">{t("canvas.project.updated", { date: new Date(project.updatedAt).toLocaleString(i18n.resolvedLanguage, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) })}</p>
+                    <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                        {editing ? (
+                            <>
+                                <Button type="text" size="small" shape="circle" icon={<Check className="size-4" />} onClick={saveTitle} aria-label={t("canvas.project.saveName")} />
+                                <Button type="text" size="small" shape="circle" icon={<X className="size-4" />} onClick={stopEditing} aria-label={t("canvas.project.cancelRename")} />
+                            </>
+                        ) : (
+                            <>
+                                <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} loading={exporting} disabled={exporting} onClick={() => void exportProject()} aria-label={t("canvas.project.export")} />
+                                <Button type="text" size="small" shape="circle" icon={<Copy className="size-4" />} onClick={openCopyDialog} aria-label={t("canvas.project.copy")} />
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    shape="circle"
+                                    icon={<FolderInput className="size-4" />}
+                                    onClick={() => {
+                                        setMoveFolderId(project.folderId);
+                                        setMoveOpen(true);
+                                    }}
+                                    aria-label={t("canvas.project.move")}
+                                />
+                                <Button type="text" size="small" shape="circle" icon={<Pencil className="size-4" />} onClick={() => startEditing(project.id, project.title)} aria-label={t("canvas.project.rename")} />
+                                <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-4" />} onClick={() => setDeleteIds([project.id])} aria-label={t("canvas.project.delete")} />
+                            </>
+                        )}
+                    </div>
+                </div>
+            </article>
+            <Modal title={t("canvas.project.copyTitle")} open={copyOpen} onCancel={() => setCopyOpen(false)} onOk={confirmCopy} okButtonProps={{ disabled: !copyTitle.trim() }} okText={t("common.confirm")} cancelText={t("common.cancel")}>
+                <Input value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} onPressEnter={confirmCopy} autoFocus />
+                <label className="mt-4 grid gap-2 text-sm">
+                    <span>{t("canvas.folder.destination")}</span>
+                    <CanvasFolderSelect value={copyFolderId} onChange={setCopyFolderId} />
+                </label>
+            </Modal>
+            <Modal
+                title={t("canvas.project.moveTitle")}
+                open={moveOpen}
+                onCancel={() => setMoveOpen(false)}
+                onOk={() => {
+                    moveProjects([project.id], moveFolderId);
+                    setMoveOpen(false);
+                    message.success(t("canvas.project.moved"));
+                }}
+                okText={t("common.confirm")}
+                cancelText={t("common.cancel")}
+            >
+                <CanvasFolderSelect value={moveFolderId} onChange={setMoveFolderId} className="w-full" />
+            </Modal>
+        </>
+    );
 }

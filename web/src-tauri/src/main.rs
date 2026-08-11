@@ -6,6 +6,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{io::{Read, Write}, net::{TcpListener, TcpStream}, process::Command, thread, time::{Duration, Instant}};
+use tauri::Manager;
 
 #[tauri::command]
 fn save_download(app: tauri::AppHandle, filename: String, bytes: Vec<u8>) -> Result<bool, String> {
@@ -120,6 +121,15 @@ fn open_system_browser(url: String) -> Result<(), String> {
     open_browser(&url)
 }
 
+#[tauri::command]
+fn bundled_codex_plugin_path(app: tauri::AppHandle) -> Result<String, String> {
+    let path = app.path().resource_dir().map_err(|error| error.to_string())?.join("codex-plugin-marketplace");
+    if !path.exists() {
+        return Err("Bundled Codex plugin was not found".to_string());
+    }
+    Ok(path.to_string_lossy().to_string())
+}
+
 fn open_browser(url: &str) -> Result<(), String> {
     Command::new("rundll32.exe").args(["url.dll,FileProtocolHandler", url]).spawn().map_err(|error| error.to_string())?;
     Ok(())
@@ -129,7 +139,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
-        .invoke_handler(tauri::generate_handler![save_download, google_oauth_authorize, google_oauth_refresh, open_system_browser])
+        .invoke_handler(tauri::generate_handler![save_download, google_oauth_authorize, google_oauth_refresh, open_system_browser, bundled_codex_plugin_path])
         .run(tauri::generate_context!())
         .expect("运行无限画板桌面版时发生错误");
 }

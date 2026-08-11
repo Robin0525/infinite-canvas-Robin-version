@@ -1,6 +1,6 @@
 [package]
 name = "infinite-canvas-desktop"
-version = "0.15.3"
+version = "0.15.4"
 description = "Infinite Canvas Windows desktop application"
 authors = ["Infinite Canvas contributors"]
 edition = "2021"

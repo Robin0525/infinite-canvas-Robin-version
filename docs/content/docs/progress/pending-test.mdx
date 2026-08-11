@@ -7,8 +7,12 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
-- Version dialog: clicking the desktop version number shows detailed v0.15.3 and Unreleased entries. The embedded changelog remains available offline, while update checks and the GitHub shortcut target `Robin0525/infinite-canvas-Robin-version`.
-- Batch run semantics: enabling batch mode resets the image count control to 1 run. With element groups of 2 and 3 members, 1 run produces exactly one 6-image row, while 2 runs produce two separate 6-image rows without a duplicated root image.
+- Canvas folders: create, rename, copy, move, and recursively delete nested folders. Folder copies include their subtree and canvases, cycles are prevented, and canvas Move to / Copy to preserve the selected destination while Copy to defaults to the source folder.
+- Multi-image overview: regular multi-image and batch generation create one independent overview followed by the exact number of actual result nodes. The overview collages up to nine successful images; double-clicking it only expands/collapses results, while double-clicking a result opens the image preview.
+- Robin plugin distribution: the installed Windows app exposes the bundled plugin marketplace path and copyable install command. MCP and direct Agent commands source `Robin0525/infinite-canvas-Robin-version` without developer-specific absolute paths or the upstream Agent command.
+- Branding and GitHub: switching to English immediately changes the top-left brand to “Infinite Canvas”; the desktop GitHub icon opens the Robin Version repository in the system browser.
+- Version dialog: clicking the desktop version number shows detailed v0.15.4 entries. The embedded changelog remains available offline, while update checks and the GitHub shortcut target `Robin0525/infinite-canvas-Robin-version`.
+- Batch run semantics: with element groups of 2 and 3 members, 1 run produces one overview plus 6 actual results, while 2 runs produce two vertically separated groups, each with one overview and 6 actual results.
 - Repeated generation layout and scheduling: clicking Generate again places the new result group below all prior groups. Concurrent mode starts up to 10 independent requests together, while sequential mode does not submit the next request until the previous result is saved.
 - Element-group deletion: deleting one or more misaligned members immediately compacts the remaining members in their saved order without resizing the group.
 - Filled video deletion: focus or play a video node, select it, then press Delete or Backspace; the node and its connections should be removed just like an empty video node.

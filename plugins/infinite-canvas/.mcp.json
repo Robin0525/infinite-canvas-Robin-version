@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "infinite-canvas": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "D:\\document\\ChatGPT\\无限画板开发\\infinite-canvas-desktop-robin-version\\canvas-agent\\dist\\index.js",
+        "-y",
+        "github:Robin0525/infinite-canvas-Robin-version#main",
         "mcp"
       ],
       "startup_timeout_sec": 20,

@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"默认桌面窗口能力","local":true,"windows":["main"],"permissions":["core:default",{"identifier":"http:default","allow":["https://*","http://*"]}]}}
+{"default":{"identifier":"default","description":"默认桌面窗口能力","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-set-title",{"identifier":"http:default","allow":["https://*","http://*"]}]}}

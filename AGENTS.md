@@ -82,6 +82,7 @@
 
 ## 项目注意事项
 
+- MCP 工具新增、删除或修改时，必须同时递增 Infinite Canvas 插件版本并重新构建 `canvas-agent/dist`；不要只替换本地 `dist` 文件。发布前必须以 `node dist/index.js mcp` 启动真实 MCP 服务并调用 `tools/list`，验证新增工具确实被暴露。仅测试内部 `session.callTool()` 不足以证明 Codex 可调用。已安装旧插件或正在进行的 Codex 对话可能缓存旧工具目录；更新后需走插件 cachebuster/reinstall 流程，并提示用户更新插件后新开对话。发布版本应让插件版本、Canvas Agent 版本和 MCP 暴露的工具集保持一致。
 - 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。
 - 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。

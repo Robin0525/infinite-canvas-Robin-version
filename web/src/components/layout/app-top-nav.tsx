@@ -2,6 +2,7 @@ import { Bot, Menu } from "lucide-react";
 import { Button, Tooltip } from "antd";
 import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
@@ -12,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAgentStore } from "@/stores/use-agent-store";
 
 export function AppTopNav() {
-    const { t } = useTranslation();
+    const { i18n, t } = useTranslation();
     const { pathname } = useLocation();
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     const autoConnectRef = useRef(false);
@@ -25,6 +26,13 @@ export function AppTopNav() {
     const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
+    const brandTitle = i18n.resolvedLanguage?.startsWith("en") ? "Infinite Canvas" : "无限画布";
+    const windowTitle = `${brandTitle} Robin Version`;
+
+    useEffect(() => {
+        if (!("__TAURI_INTERNALS__" in window)) return;
+        void getCurrentWindow().setTitle(windowTitle);
+    }, [windowTitle]);
 
     useEffect(() => {
         if (autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;
@@ -46,7 +54,7 @@ export function AppTopNav() {
                                         WebkitMask: "url(/logo.svg) center / contain no-repeat",
                                     }}
                                 />
-                                <span className="text-base font-medium">{t("meta.title")}</span>
+                                <span className="text-base font-medium">{brandTitle}</span>
                             </Link>
 
                             <button
